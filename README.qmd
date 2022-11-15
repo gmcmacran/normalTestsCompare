@@ -1,0 +1,99 @@
+---
+format: gfm
+---
+
+## Which Goodness of Fit Test is Best?
+
+There are many goodness of fit tests for checking normality. Which test is best? Is one test best in some situations and another test best in other situations? This repo puts five hypothesis tests head to head to see if one stands out.
+
+Tests:
+
+-   Anderson-Darling test
+-   Cramer-von Mises test
+-   Kolmogorov-Smirnov test
+-   Pearson chi-square test
+-   Shapiro-Francia test
+
+## Experimental Design
+
+Each row is an experiment. Thirty data points are randomly generated and the five hypothesis tests are done. This process is repeated 1,000 times. Non-normality is controlled by varying the parameter value of the true distribution. The first 10 rows look like
+
+```{r}
+#| include: false
+library(tidyverse)
+```
+
+```{r}
+#| echo: false
+stableDF <- readRDS("data/stableDF.rds") %>%
+  select(param, iteration, AD_P, CVM_P, LILLIE_P, PEARSON_P, SF_P) %>%
+  mutate(AD_P = round(AD_P, 4),
+         CVM_P = round(CVM_P, 4),
+         LILLIE_P = round(LILLIE_P, 4),
+         PEARSON_P = round(PEARSON_P, 4),
+         SF_P = round(SF_P, 4)) %>%
+  arrange(param, iteration)
+stableDF %>%
+  print(n = 10)
+```
+
+For each combination of hypothesis test and parameter value, the 1,000 experiments are aggregated to calculate power.
+
+```{r}
+#| echo: false
+calc_power <- function(pvalues) {
+  out <- mean(pvalues <= .05)
+}
+stableDF_02 <- stableDF %>%
+  group_by(param) %>%
+  summarise(across(contains("_P"), calc_power)) %>%
+  pivot_longer(cols = contains("_P"), values_to = "power", names_to = "test") %>%
+  mutate(power = round(power, 2))
+stableDF_02 %>%
+  print(n = 10)
+```
+
+## Stable Distribution
+
+The stable distribution provides a way of quantifying how non-normal the data is. When alpha is two, the stable distribution is the same as the Gaussian distribution. As alpha gets further from two, the data gets less and less normal. When alpha is one, the stable distribution is the same as the Cauchy distribution.
+
+```{r}
+#| echo: false
+ggplot(stableDF_02, aes(x = param, y = power, colour = test, label = power)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(breaks = seq(1, 1.95, .10)) +
+  scale_y_continuous(breaks = seq(0, 1, .1), limits = c(0, 1)) +
+  labs(title = "Stable Distribution Power Curve", x = "Alpha", y = "Power", colour = "Test")
+rm(stableDF, stableDF_02, calc_power)
+```
+
+No matter how non-normal the data is, the Shapiro-Francia test is always best. The Anderson-Darling test is second best.
+
+## Tweedie Distribution
+
+The Tweedie distribution provides another way of controlling non-normality. When xi is one, the Tweedie distribution is the same as a Poisson distribution. As xi increases, the Tweedie distribution is a compound poisson gamma distribution. When it is two, the Tweedie distribution is the same as a gamma distribution.
+
+```{r}
+#| echo: false
+calc_power <- function(pvalues) {
+  out <- mean(pvalues <= .05)
+}
+tweedieDF <- readRDS("data/tweedieDF.rds") %>%
+  arrange(param, iteration)
+
+tweedieDF_02 <- tweedieDF %>%
+  group_by(param) %>%
+  summarise(across(contains("_P"), calc_power)) %>%
+  pivot_longer(cols = contains("_P"), values_to = "power", names_to = "test") %>%
+  mutate(power = round(power, 2))
+
+ggplot(tweedieDF_02, aes(x = param, y = power, colour = test, label = power)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(breaks = seq(1, 2, .10)) +
+  scale_y_continuous(breaks = seq(0, 1, .1), limits = c(0, 1)) +
+  labs(title = "Tweedie Distribution Power Curve", x = "Xi", y = "Power", colour = "Test")
+```
+
+No matter where the data falls between Poisson and gamma, the Shapiro-Francia test is always best. The Anderson-Darling test is second best.
