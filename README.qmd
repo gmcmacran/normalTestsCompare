@@ -59,6 +59,19 @@ The stable distribution provides a way of quantifying how non-normal the data is
 
 ```{r}
 #| echo: false
+
+stableDF <- readRDS("data/stableDF.rds") %>%
+  arrange(param, iteration)
+
+calc_power <- function(pvalues) {
+  out <- mean(pvalues <= .05)
+}
+stableDF_02 <- stableDF %>%
+  group_by(param) %>%
+  summarise(across(contains("_P"), calc_power)) %>%
+  pivot_longer(cols = contains("_P"), values_to = "power", names_to = "test") %>%
+  mutate(power = round(power, 2))
+
 ggplot(stableDF_02, aes(x = param, y = power, colour = test, label = power)) +
   geom_point() +
   geom_line() +
